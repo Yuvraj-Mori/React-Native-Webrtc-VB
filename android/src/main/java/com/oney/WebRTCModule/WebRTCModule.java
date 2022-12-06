@@ -612,6 +612,16 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void mediaStreamTrackChangeVbStatus(String id, boolean status) {
+        ThreadUtils.runOnExecutor(() -> {
+            MediaStreamTrack track = getLocalTrack(id);
+            if (track != null) {
+                getUserMediaImpl.changeVBStatus(id, status);
+            }
+        });
+    }
+
+    @ReactMethod
     public void peerConnectionSetConfiguration(ReadableMap configuration,
                                                int id) {
         ThreadUtils.runOnExecutor(() -> {

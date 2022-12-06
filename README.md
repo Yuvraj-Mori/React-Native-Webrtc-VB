@@ -132,6 +132,10 @@ This is useful to make existing WebRTC JavaScript libraries (that expect those g
 This function allows to switch the front / back cameras in a video track
 on the fly, without the need for adding / removing tracks or renegotiating.
 
+#### MediaStreamTrack.prototype._changeVBStatus(status:boolean)
+
+This function allows to enable/disable virtual background  
+
 #### VideoTrack.enabled
 
 Starting with version 1.67, when setting a local video track's enabled state to

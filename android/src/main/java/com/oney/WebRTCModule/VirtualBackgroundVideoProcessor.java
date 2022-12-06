@@ -12,6 +12,7 @@ import android.graphics.Paint;
 import android.graphics.PorterDuffXfermode;
 import android.opengl.GLES20;
 import android.opengl.GLUtils;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 
@@ -40,6 +41,10 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
     private YuvFrame yuvFrame;
     private Bitmap inputFrameBitmap;
     private int frameCounter = 0;
+
+    private boolean vbStatus = false;
+
+    public static String Log_Tag = "REACT_NATIVE_WEBRTC_VB";
 
     final Bitmap backgroundImage;
     final Bitmap scaled;
@@ -76,6 +81,12 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
 
     @Override
     public void onFrameCaptured(VideoFrame videoFrame) {
+
+        if(!vbStatus) {
+            target.onFrame(videoFrame);
+            Log.d(Log_Tag, "Bypass VB Process");
+            return;
+        }
 
         if(frameCounter == 0) {
             yuvFrame = new YuvFrame(videoFrame);
@@ -162,5 +173,10 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
             }
         }
         return colors;
+    }
+
+    public void  setVbStatus(boolean vbStatus)
+    {
+        this.vbStatus = vbStatus;
     }
 }

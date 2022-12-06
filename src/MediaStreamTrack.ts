@@ -78,6 +78,16 @@ class MediaStreamTrack extends defineCustomEventTarget(...MEDIA_STREAM_TRACK_EVE
         WebRTCModule.mediaStreamTrackSwitchCamera(this.id);
     }
 
+    _changeVBStatus(status:boolean) {
+        if (this.remote) {
+            throw new Error('Not implemented for remote tracks');
+        }
+        if (this.kind !== 'video') {
+            throw new Error('Only implemented for video tracks');
+        }
+        WebRTCModule.mediaStreamTrackChangeVbStatus(this.id, status);
+    }
+
     applyConstraints() {
         throw new Error('Not implemented.');
     }

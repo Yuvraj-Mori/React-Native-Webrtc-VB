@@ -52,6 +52,8 @@ class GetUserMediaImpl {
     private Promise displayMediaPromise;
     private Intent mediaProjectionPermissionResultData;
 
+    private  VirtualBackgroundVideoProcessor videoVbProcessor;
+
     GetUserMediaImpl(WebRTCModule webRTCModule, ReactApplicationContext reactContext) {
         this.webRTCModule = webRTCModule;
         this.reactContext = reactContext;
@@ -246,6 +248,13 @@ class GetUserMediaImpl {
         }
     }
 
+    void changeVBStatus(String trackId, boolean status) {
+        TrackPrivate track = tracks.get(trackId);
+        if (track != null && videoVbProcessor != null) {
+            videoVbProcessor.setVbStatus(status);
+        }
+    }
+
     void getDisplayMedia(Promise promise) {
         if (this.displayMediaPromise != null) {
             promise.reject(new RuntimeException("Another operation is pending."));
@@ -379,10 +388,10 @@ class GetUserMediaImpl {
         VideoSource videoSource = pcFactory.createVideoSource(videoCapturer.isScreencast());
         videoCapturer.initialize(surfaceTextureHelper, reactContext, videoSource.getCapturerObserver());
 
-        if(vb) {
-            VideoProcessor p = new VirtualBackgroundVideoProcessor(reactContext, surfaceTextureHelper);
-            videoSource.setVideoProcessor(p);
-        }
+        videoVbProcessor = new VirtualBackgroundVideoProcessor(reactContext, surfaceTextureHelper);
+        videoSource.setVideoProcessor(videoVbProcessor);
+
+        if(videoVbProcessor != null)  videoVbProcessor.setVbStatus(vb);
 
         String id = UUID.randomUUID().toString();
         VideoTrack track = pcFactory.createVideoTrack(id, videoSource);

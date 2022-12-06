@@ -14,6 +14,7 @@ public abstract class AbstractVideoCaptureController {
     protected VideoCapturer videoCapturer;
 
     public AbstractVideoCaptureController(int width, int height, int fps) {
+
         this.width = width;
         this.height = height;
         this.fps = fps;
