@@ -32,6 +32,8 @@ import org.webrtc.VideoProcessor;
 import org.webrtc.VideoSink;
 import org.webrtc.YuvConverter;
 
+import java.net.URL;
+
 public class VirtualBackgroundVideoProcessor implements VideoProcessor {
 
     private VideoSink target;
@@ -43,11 +45,14 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
     private int frameCounter = 0;
 
     private boolean vbStatus = false;
+    private int width;
+    private int height;
+    private String vbBackgroundImageUri;
 
     public static String Log_Tag = "REACT_NATIVE_WEBRTC_VB";
 
-    final Bitmap backgroundImage;
-    final Bitmap scaled;
+    Bitmap backgroundImage;
+    Bitmap scaled;
 
     final SelfieSegmenterOptions options =
         new SelfieSegmenterOptions.Builder()
@@ -55,13 +60,31 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
             .build();
     final Segmenter segmenter = Segmentation.getClient(options);
 
-    public VirtualBackgroundVideoProcessor(ReactApplicationContext context, SurfaceTextureHelper surfaceTextureHelper) {
+    public VirtualBackgroundVideoProcessor(ReactApplicationContext context, SurfaceTextureHelper surfaceTextureHelper, int width, int height, String vbBackgroundImageUri) {
         super();
 
         this.surfaceTextureHelper = surfaceTextureHelper;
+        this.width = width;
+        this.height = height;
+        this.vbBackgroundImageUri = vbBackgroundImageUri;
+        if(this.vbBackgroundImageUri == null)
+        {
+            backgroundImage = BitmapFactory.decodeResource(context.getResources(), R.drawable.portrait_background);
+            Log.d(Log_Tag,"VB Background Set Defaul Image :"+ this.vbBackgroundImageUri);
+        }
+        else
+        {
+            try {
+                backgroundImage = BitmapFactory.decodeStream(new URL(this.vbBackgroundImageUri).openStream());
+            }
+            catch (Exception e)
+            {
+                backgroundImage = BitmapFactory.decodeResource(context.getResources(), R.drawable.portrait_background);
+                Log.d(Log_Tag,"VB Background Image Creation Fail Uri:"+ this.vbBackgroundImageUri);
+            }
+        }
 
-        backgroundImage = BitmapFactory.decodeResource(context.getResources(), R.drawable.portrait_background);
-        scaled = Bitmap.createScaledBitmap(backgroundImage, 640, 640, false );
+        scaled = Bitmap.createScaledBitmap(backgroundImage, this.height, this.width, false );
     }
 
     @Override
@@ -84,16 +107,17 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
 
         if(!vbStatus) {
             target.onFrame(videoFrame);
-            Log.d(Log_Tag, "Bypass VB Process");
+            //Log.d(Log_Tag, "Bypass VB Process");
             return;
         }
-
         if(frameCounter == 0) {
+
+            //Log.d(Log_Tag, "VB VideoFrame Before Process Width : "+ videoFrame.getRotatedWidth() + " , Height:"+ videoFrame.getRotatedHeight());
+
             yuvFrame = new YuvFrame(videoFrame);
             inputFrameBitmap = yuvFrame.getBitmap();
 
             InputImage image = InputImage.fromBitmap(inputFrameBitmap, 0);
-
             Task<SegmentationMask> result =
                 segmenter.process(image)
                     .addOnSuccessListener(
@@ -117,7 +141,6 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
                                 canvas.drawBitmap(scaled, 0, 0, paint);
                                 paint.setXfermode(new PorterDuffXfermode(DST_OVER));
                                 canvas.drawBitmap(inputFrameBitmap, 0, 0, paint);
-
                                 surfaceTextureHelper.getHandler().post(new Runnable() {
                                     @Override
                                     public void run() {
@@ -138,7 +161,6 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
 
                                         buffer.release();
                                         //yuvFrame.dispose();
-
                                         target.onFrame(out);
                                         out.release();
                                     }
@@ -178,5 +200,22 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
     public void  setVbStatus(boolean vbStatus)
     {
         this.vbStatus = vbStatus;
+    }
+    public void  setWidth(int width)
+    {
+        this.width = width;
+    }
+    public void  setHeight(int height)
+    {
+        this.height = height;
+    }
+    public void  setSize(int width, int height)
+    {
+        this.height = height;
+        this.width = width;
+    }
+    public  void setVbBackgroundImageUri(String uri)
+    {
+        this.vbBackgroundImageUri = uri;
     }
 }

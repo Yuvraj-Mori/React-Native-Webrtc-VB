@@ -205,6 +205,11 @@ export function normalizeConstraints(constraints) {
             c['video'].vb = true;
         }
     }
+    if(constraints['video'] && constraints['video'].hasOwnProperty('vbBackgroundImage')) {
+        if(c['video']) {
+            c['video'].vbBackgroundImage = constraints['video'].vbBackgroundImage;
+        }
+    }
 
     return c;
 }

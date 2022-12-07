@@ -201,7 +201,10 @@ class GetUserMediaImpl {
                 cameraEnumerator,
                 videoConstraintsMap);
 
-            videoTrack = createVideoTrack(cameraCaptureController, videoConstraintsMap.hasKey("vb"));
+            String vbBackgroundImageUri = null;
+            if(videoConstraintsMap.hasKey("vbBackgroundImage")) vbBackgroundImageUri =   videoConstraintsMap.getString(("vbBackgroundImage"));
+
+            videoTrack = createVideoTrack(cameraCaptureController, videoConstraintsMap.hasKey("vb"), vbBackgroundImageUri);
         }
 
         if (audioTrack == null && videoTrack == null) {
@@ -364,10 +367,10 @@ class GetUserMediaImpl {
         int height = displayMetrics.heightPixels;
         ScreenCaptureController screenCaptureController
             = new ScreenCaptureController(reactContext.getCurrentActivity(), width, height, mediaProjectionPermissionResultData);
-        return createVideoTrack(screenCaptureController, false);
+        return createVideoTrack(screenCaptureController, false, "");
     }
 
-    private VideoTrack createVideoTrack(AbstractVideoCaptureController videoCaptureController, Boolean vb) {
+    private VideoTrack createVideoTrack(AbstractVideoCaptureController videoCaptureController, Boolean vb,  String vbBackgroundImageUri) {
         videoCaptureController.initializeVideoCapturer();
 
         VideoCapturer videoCapturer = videoCaptureController.videoCapturer;
@@ -388,7 +391,7 @@ class GetUserMediaImpl {
         VideoSource videoSource = pcFactory.createVideoSource(videoCapturer.isScreencast());
         videoCapturer.initialize(surfaceTextureHelper, reactContext, videoSource.getCapturerObserver());
 
-        videoVbProcessor = new VirtualBackgroundVideoProcessor(reactContext, surfaceTextureHelper);
+        videoVbProcessor = new VirtualBackgroundVideoProcessor(reactContext, surfaceTextureHelper, videoCaptureController.getWidth(), videoCaptureController.getHeight(), vbBackgroundImageUri);
         videoSource.setVideoProcessor(videoVbProcessor);
 
         if(videoVbProcessor != null)  videoVbProcessor.setVbStatus(vb);
