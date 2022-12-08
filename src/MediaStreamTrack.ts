@@ -88,7 +88,7 @@ class MediaStreamTrack extends defineCustomEventTarget(...MEDIA_STREAM_TRACK_EVE
         WebRTCModule.mediaStreamTrackChangeVbStatus(this.id, status);
     }
 
-    _changeVBImageUri(imgRequire: any) {
+    _changeVBImage(imgRequire: any) {
         if (this.remote) {
             throw new Error('Not implemented for remote tracks');
         }
