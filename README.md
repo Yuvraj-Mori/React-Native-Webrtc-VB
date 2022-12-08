@@ -126,6 +126,21 @@ By calling this method the JavaScript global namespace gets "polluted" with the 
 
 This is useful to make existing WebRTC JavaScript libraries (that expect those globals to exist) work with react-native-webrtc.
 
+#### Virtual background camera constraint getUserMedia time
+
+### const camConstraint = {
+  video: {
+    frameRate: 30,
+    width: 720,
+    height: 480,
+    facingMode: { exact: 'back' },
+    vb: true,
+    vbBackgroundImage: require("./assets/1.jpg"),
+    vbFrameSkip: 0
+  }
+}
+
+above constraint use initial vb start or use below track method on the fly without the need for adding / removing tracks or renegotiating.
 
 #### MediaStreamTrack.prototype._switchCamera()
 
@@ -135,6 +150,17 @@ on the fly, without the need for adding / removing tracks or renegotiating.
 #### MediaStreamTrack.prototype._changeVBStatus(status:boolean)
 
 This function allows to enable/disable virtual background  
+
+#### MediaStreamTrack.prototype._changeVBImage(imgRequire: any)
+This function allows to change virtual background image  
+e.g myLocalVideoTrack._changeVBImage(require("./assets/vbImage.jpg"))
+
+#### MediaStreamTrack.prototype._changeVBFrameSkip(vbFrameSkip: number)
+This function through assing number of frame skip in vb process, default value is 3 so,
+every 3 frame after process one frame, also consider FPS like vbFrameSkip is 3 and FPS 30 so, we receive 10 frame 
+and vbFrameSkip 0 to receive smooth output means actual FPS
+
+e.g myLocalVideoTrack._changeVBFrameSkip(1)
 
 #### VideoTrack.enabled
 

@@ -25,6 +25,7 @@ import org.webrtc.RendererCommon;
 import org.webrtc.RendererCommon.RendererEvents;
 import org.webrtc.RendererCommon.ScalingType;
 import org.webrtc.SurfaceViewRenderer;
+import org.webrtc.VideoSink;
 import org.webrtc.VideoTrack;
 
 public class WebRTCView extends ViewGroup {

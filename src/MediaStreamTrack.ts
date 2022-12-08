@@ -2,7 +2,7 @@
 import { NativeModules } from 'react-native';
 import { defineCustomEventTarget } from 'event-target-shim';
 
-import { deepClone } from './RTCUtil';
+import { assetFileToUri, deepClone } from './RTCUtil';
 
 const { WebRTCModule } = NativeModules;
 
@@ -78,7 +78,7 @@ class MediaStreamTrack extends defineCustomEventTarget(...MEDIA_STREAM_TRACK_EVE
         WebRTCModule.mediaStreamTrackSwitchCamera(this.id);
     }
 
-    _changeVBStatus(status:boolean) {
+    _changeVBStatus(status: boolean) {
         if (this.remote) {
             throw new Error('Not implemented for remote tracks');
         }
@@ -86,6 +86,28 @@ class MediaStreamTrack extends defineCustomEventTarget(...MEDIA_STREAM_TRACK_EVE
             throw new Error('Only implemented for video tracks');
         }
         WebRTCModule.mediaStreamTrackChangeVbStatus(this.id, status);
+    }
+
+    _changeVBImageUri(imgRequire: any) {
+        if (this.remote) {
+            throw new Error('Not implemented for remote tracks');
+        }
+        if (this.kind !== 'video') {
+            throw new Error('Only implemented for video tracks');
+        }
+        let vbImageUri = assetFileToUri(imgRequire);
+        console.log("Change VB Image Uri", vbImageUri);
+        WebRTCModule.mediaStreamTrackChangeVbImageUri(this.id, vbImageUri);
+    }
+
+    _changeVBFrameSkip(vbFrameSkip: number) {
+        if (this.remote) {
+            throw new Error('Not implemented for remote tracks');
+        }
+        if (this.kind !== 'video') {
+            throw new Error('Only implemented for video tracks');
+        }
+        WebRTCModule.mediaStreamTrackChangeVbFrameSkip(this.id, vbFrameSkip);
     }
 
     applyConstraints() {
