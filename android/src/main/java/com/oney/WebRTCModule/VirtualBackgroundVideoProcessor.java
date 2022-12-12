@@ -106,6 +106,7 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
         }
 
         scaled = Bitmap.createScaledBitmap(backgroundImage, this.height, this.width, false );
+       // Log.d(Log_Tag,"VB Background Image Init Size -> width : "+ this.width + ", height : " + this.height);
     }
 
     @Override
@@ -133,10 +134,13 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
         }
         if(frameCounter == 0) {
 
-            //Log.d(Log_Tag, "VB VideoFrame Before Process Width : "+ videoFrame.getRotatedWidth() + " , Height:"+ videoFrame.getRotatedHeight());
+            // Log.d(Log_Tag, "VB Actual  Width : "+ this.width + " , Height:"+ this.height);
+            // Log.d(Log_Tag, "VB VideoFrame Before Process Width : "+ videoFrame.getRotatedWidth() + " , Height:"+ videoFrame.getRotatedHeight());
 
             yuvFrame = new YuvFrame(videoFrame);
             inputFrameBitmap = yuvFrame.getBitmap();
+
+            //Log.d(Log_Tag, "VB YUV Process Width : "+ inputFrameBitmap.getWidth() + " , Height:"+ inputFrameBitmap.getHeight());
 
             InputImage image = InputImage.fromBitmap(inputFrameBitmap, 0);
             Task<SegmentationMask> result =

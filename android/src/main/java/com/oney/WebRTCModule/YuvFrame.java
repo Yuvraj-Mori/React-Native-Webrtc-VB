@@ -16,6 +16,8 @@ public class YuvFrame {
 
     private final Object planeLock = new Object();
 
+    public static String Log_Tag = "REACT_NATIVE_WEBRTC_VB";
+    
     public YuvFrame(final VideoFrame videoFrame) {
         fromVideoFrame(videoFrame, System.nanoTime());
     }
@@ -130,11 +132,12 @@ public class YuvFrame {
         Bitmap bitmap = Bitmap.createBitmap( argb, width, height, Bitmap.Config.ARGB_8888 );
         argb = null;
 
+
         // If necessary, generate a rotated version of the Bitmap
         if ( rotationDegree == 90 || rotationDegree == -270 )
         {
             final Matrix m = new Matrix();
-            m.preScale(-1, 1);
+            m.preScale(1, -1);
             m.postRotate( 90 );
 
             return Bitmap.createBitmap( bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), m, true );
