@@ -50,6 +50,8 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
     private int height = 720;
     private String vbBackgroundImageUri = null;
     private int vbFrameSkip = 3;
+    private boolean isBlur = false;
+
     final private ReactApplicationContext context;
     public static String Log_Tag = "REACT_NATIVE_WEBRTC_VB";
 
@@ -57,9 +59,9 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
     Bitmap scaled;
 
     final SelfieSegmenterOptions options =
-        new SelfieSegmenterOptions.Builder()
-            .setDetectorMode(SelfieSegmenterOptions.STREAM_MODE)
-            .build();
+            new SelfieSegmenterOptions.Builder()
+                    .setDetectorMode(SelfieSegmenterOptions.STREAM_MODE)
+                    .build();
     final Segmenter segmenter = Segmentation.getClient(options);
 
     public VirtualBackgroundVideoProcessor(ReactApplicationContext context, SurfaceTextureHelper surfaceTextureHelper, final ReadableMap videoConstraintsMap) {
@@ -106,7 +108,7 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
         }
 
         scaled = Bitmap.createScaledBitmap(backgroundImage, this.height, this.width, false );
-       // Log.d(Log_Tag,"VB Background Image Init Size -> width : "+ this.width + ", height : " + this.height);
+        // Log.d(Log_Tag,"VB Background Image Init Size -> width : "+ this.width + ", height : " + this.height);
     }
 
     @Override
@@ -144,55 +146,56 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
 
             InputImage image = InputImage.fromBitmap(inputFrameBitmap, 0);
             Task<SegmentationMask> result =
-                segmenter.process(image)
-                    .addOnSuccessListener(
-                        new OnSuccessListener<SegmentationMask>() {
-                            @Override
-                            public void onSuccess(SegmentationMask mask) {
+                    segmenter.process(image)
+                            .addOnSuccessListener(
+                                    new OnSuccessListener<SegmentationMask>() {
+                                        @Override
+                                        public void onSuccess(SegmentationMask mask) {
 
-                                mask.getBuffer().rewind();
-                                int[] arr = maskColorsFromByteBuffer(mask);
-                                Bitmap segmentedBitmap = Bitmap.createBitmap(
-                                    arr, mask.getWidth(), mask.getHeight(), Bitmap.Config.ARGB_8888
-                                );
-                                arr = null;
+                                            mask.getBuffer().rewind();
+                                            int[] arr = maskColorsFromByteBuffer(mask);
+                                            Bitmap segmentedBitmap = Bitmap.createBitmap(
+                                                    arr, mask.getWidth(), mask.getHeight(), Bitmap.Config.ARGB_8888
+                                            );
+                                            arr = null;
 
-                                Bitmap segmentedBitmapMutable = segmentedBitmap.copy(Bitmap.Config.ARGB_8888, true);
-                                segmentedBitmap.recycle();
-                                Canvas canvas = new Canvas(segmentedBitmapMutable);
+                                            Bitmap segmentedBitmapMutable = segmentedBitmap.copy(Bitmap.Config.ARGB_8888, true);
+                                            segmentedBitmap.recycle();
+                                            Canvas canvas = new Canvas(segmentedBitmapMutable);
 
-                                Paint paint = new Paint();
-                                paint.setXfermode(new PorterDuffXfermode(SRC_IN));
-                                canvas.drawBitmap(scaled, 0, 0, paint);
-                                paint.setXfermode(new PorterDuffXfermode(DST_OVER));
-                                canvas.drawBitmap(inputFrameBitmap, 0, 0, paint);
-                                surfaceTextureHelper.getHandler().post(new Runnable() {
-                                    @Override
-                                    public void run() {
+                                            Paint paint = new Paint();
+                                            paint.setXfermode(new PorterDuffXfermode(SRC_IN));
+                                            Bitmap newBitmap  = isBlur ? fastBlur(inputFrameBitmap,1,20) :  scaled;
+                                            canvas.drawBitmap(newBitmap, 0, 0, paint);
+                                            paint.setXfermode(new PorterDuffXfermode(DST_OVER));
+                                            canvas.drawBitmap(inputFrameBitmap, 0, 0, paint);
+                                            surfaceTextureHelper.getHandler().post(new Runnable() {
+                                                @Override
+                                                public void run() {
 
-                                        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-                                        TextureBufferImpl buffer = new TextureBufferImpl(segmentedBitmapMutable.getWidth(),
-                                            segmentedBitmapMutable.getHeight(), VideoFrame.TextureBuffer.Type.RGB,
-                                            GLES20.GL_TEXTURE0, new Matrix(), surfaceTextureHelper.getHandler(), yuvConverter, null);
-                                        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE0);
+                                                    GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+                                                    TextureBufferImpl buffer = new TextureBufferImpl(segmentedBitmapMutable.getWidth(),
+                                                            segmentedBitmapMutable.getHeight(), VideoFrame.TextureBuffer.Type.RGB,
+                                                            GLES20.GL_TEXTURE0, new Matrix(), surfaceTextureHelper.getHandler(), yuvConverter, null);
+                                                    GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE0);
 
-                                        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST);
-                                        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST);
-                                        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, segmentedBitmapMutable, 0);
-                                        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
+                                                    GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST);
+                                                    GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST);
+                                                    GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, segmentedBitmapMutable, 0);
+                                                    GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
 
-                                        VideoFrame.I420Buffer i420Buf = yuvConverter.convert(buffer);
-                                        VideoFrame out = new VideoFrame(i420Buf, 180, videoFrame.getTimestampNs());
+                                                    VideoFrame.I420Buffer i420Buf = yuvConverter.convert(buffer);
+                                                    VideoFrame out = new VideoFrame(i420Buf, 180, videoFrame.getTimestampNs());
 
-                                        buffer.release();
-                                        //yuvFrame.dispose();
-                                        target.onFrame(out);
-                                        out.release();
-                                    }
-                                });
+                                                    buffer.release();
+                                                    //yuvFrame.dispose();
+                                                    target.onFrame(out);
+                                                    out.release();
+                                                }
+                                            });
 
-                            }
-                        });
+                                        }
+                                    });
         }
         updateFrameCounter();
     }
@@ -220,6 +223,214 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
             }
         }
         return colors;
+    }
+
+    public Bitmap fastBlur(Bitmap sentBitmap, float scale, int radius) {
+
+        int width = Math.round(sentBitmap.getWidth() * scale);
+        int height = Math.round(sentBitmap.getHeight() * scale);
+        sentBitmap = Bitmap.createScaledBitmap(sentBitmap, width, height, false);
+
+        Bitmap bitmap = sentBitmap.copy(sentBitmap.getConfig(), true);
+
+        if (radius < 1) {
+            return (null);
+        }
+
+        int w = bitmap.getWidth();
+        int h = bitmap.getHeight();
+
+        int[] pix = new int[w * h];
+        Log.e("pix", w + " " + h + " " + pix.length);
+        bitmap.getPixels(pix, 0, w, 0, 0, w, h);
+
+        int wm = w - 1;
+        int hm = h - 1;
+        int wh = w * h;
+        int div = radius + radius + 1;
+
+        int r[] = new int[wh];
+        int g[] = new int[wh];
+        int b[] = new int[wh];
+        int rsum, gsum, bsum, x, y, i, p, yp, yi, yw;
+        int vmin[] = new int[Math.max(w, h)];
+
+        int divsum = (div + 1) >> 1;
+        divsum *= divsum;
+        int dv[] = new int[256 * divsum];
+        for (i = 0; i < 256 * divsum; i++) {
+            dv[i] = (i / divsum);
+        }
+
+        yw = yi = 0;
+
+        int[][] stack = new int[div][3];
+        int stackpointer;
+        int stackstart;
+        int[] sir;
+        int rbs;
+        int r1 = radius + 1;
+        int routsum, goutsum, boutsum;
+        int rinsum, ginsum, binsum;
+
+        for (y = 0; y < h; y++) {
+            rinsum = ginsum = binsum = routsum = goutsum = boutsum = rsum = gsum = bsum = 0;
+            for (i = -radius; i <= radius; i++) {
+                p = pix[yi + Math.min(wm, Math.max(i, 0))];
+                sir = stack[i + radius];
+                sir[0] = (p & 0xff0000) >> 16;
+                sir[1] = (p & 0x00ff00) >> 8;
+                sir[2] = (p & 0x0000ff);
+                rbs = r1 - Math.abs(i);
+                rsum += sir[0] * rbs;
+                gsum += sir[1] * rbs;
+                bsum += sir[2] * rbs;
+                if (i > 0) {
+                    rinsum += sir[0];
+                    ginsum += sir[1];
+                    binsum += sir[2];
+                } else {
+                    routsum += sir[0];
+                    goutsum += sir[1];
+                    boutsum += sir[2];
+                }
+            }
+            stackpointer = radius;
+
+            for (x = 0; x < w; x++) {
+
+                r[yi] = dv[rsum];
+                g[yi] = dv[gsum];
+                b[yi] = dv[bsum];
+
+                rsum -= routsum;
+                gsum -= goutsum;
+                bsum -= boutsum;
+
+                stackstart = stackpointer - radius + div;
+                sir = stack[stackstart % div];
+
+                routsum -= sir[0];
+                goutsum -= sir[1];
+                boutsum -= sir[2];
+
+                if (y == 0) {
+                    vmin[x] = Math.min(x + radius + 1, wm);
+                }
+                p = pix[yw + vmin[x]];
+
+                sir[0] = (p & 0xff0000) >> 16;
+                sir[1] = (p & 0x00ff00) >> 8;
+                sir[2] = (p & 0x0000ff);
+
+                rinsum += sir[0];
+                ginsum += sir[1];
+                binsum += sir[2];
+
+                rsum += rinsum;
+                gsum += ginsum;
+                bsum += binsum;
+
+                stackpointer = (stackpointer + 1) % div;
+                sir = stack[(stackpointer) % div];
+
+                routsum += sir[0];
+                goutsum += sir[1];
+                boutsum += sir[2];
+
+                rinsum -= sir[0];
+                ginsum -= sir[1];
+                binsum -= sir[2];
+
+                yi++;
+            }
+            yw += w;
+        }
+        for (x = 0; x < w; x++) {
+            rinsum = ginsum = binsum = routsum = goutsum = boutsum = rsum = gsum = bsum = 0;
+            yp = -radius * w;
+            for (i = -radius; i <= radius; i++) {
+                yi = Math.max(0, yp) + x;
+
+                sir = stack[i + radius];
+
+                sir[0] = r[yi];
+                sir[1] = g[yi];
+                sir[2] = b[yi];
+
+                rbs = r1 - Math.abs(i);
+
+                rsum += r[yi] * rbs;
+                gsum += g[yi] * rbs;
+                bsum += b[yi] * rbs;
+
+                if (i > 0) {
+                    rinsum += sir[0];
+                    ginsum += sir[1];
+                    binsum += sir[2];
+                } else {
+                    routsum += sir[0];
+                    goutsum += sir[1];
+                    boutsum += sir[2];
+                }
+
+                if (i < hm) {
+                    yp += w;
+                }
+            }
+            yi = x;
+            stackpointer = radius;
+            for (y = 0; y < h; y++) {
+                // Preserve alpha channel: ( 0xff000000 & pix[yi] )
+                pix[yi] = ( 0xff000000 & pix[yi] ) | ( dv[rsum] << 16 ) | ( dv[gsum] << 8 ) | dv[bsum];
+
+                rsum -= routsum;
+                gsum -= goutsum;
+                bsum -= boutsum;
+
+                stackstart = stackpointer - radius + div;
+                sir = stack[stackstart % div];
+
+                routsum -= sir[0];
+                goutsum -= sir[1];
+                boutsum -= sir[2];
+
+                if (x == 0) {
+                    vmin[y] = Math.min(y + r1, hm) * w;
+                }
+                p = x + vmin[y];
+
+                sir[0] = r[p];
+                sir[1] = g[p];
+                sir[2] = b[p];
+
+                rinsum += sir[0];
+                ginsum += sir[1];
+                binsum += sir[2];
+
+                rsum += rinsum;
+                gsum += ginsum;
+                bsum += binsum;
+
+                stackpointer = (stackpointer + 1) % div;
+                sir = stack[stackpointer];
+
+                routsum += sir[0];
+                goutsum += sir[1];
+                boutsum += sir[2];
+
+                rinsum -= sir[0];
+                ginsum -= sir[1];
+                binsum -= sir[2];
+
+                yi += w;
+            }
+        }
+
+        Log.e("pix", w + " " + h + " " + pix.length);
+        bitmap.setPixels(pix, 0, w, 0, 0, w, h);
+
+        return (bitmap);
     }
 
     public void  setVbStatus(boolean vbStatus)
@@ -265,5 +476,10 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
     public void setVbFrameSkip(int vbFrameSkip)
     {
         this.vbFrameSkip = vbFrameSkip;
+    }
+
+    public void setBlur(boolean isBlur)
+    {
+        this.isBlur = isBlur;
     }
 }
