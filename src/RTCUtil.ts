@@ -219,6 +219,12 @@ export function normalizeConstraints(constraints) {
         }
     }
 
+    if (constraints['video'] && constraints['video'].hasOwnProperty('vbBlurValue')) {
+        if (c['video']) {
+            c['video'].vbBlurValue = constraints['video'].vbBlurValue;
+        }
+    }
+
     return c;
 }
 

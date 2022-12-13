@@ -261,6 +261,13 @@ class GetUserMediaImpl {
         }
     }
 
+    void changeVbBlurValue(String trackId, int blurValue) {
+        TrackPrivate track = tracks.get(trackId);
+        if (track != null && videoVbProcessor != null) {
+            videoVbProcessor.setVBBlurValue(blurValue);
+        }
+    }
+
     void changeVbFrameSkip(String trackId, int vbFrameSkip) {
         TrackPrivate track = tracks.get(trackId);
         if (track != null && videoVbProcessor != null) {

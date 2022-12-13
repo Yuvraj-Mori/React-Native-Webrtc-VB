@@ -632,6 +632,16 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void mediaStreamTrackChangeVbBlurValue(String id, int blurValue) {
+        ThreadUtils.runOnExecutor(() -> {
+            MediaStreamTrack track = getLocalTrack(id);
+            if (track != null) {
+                getUserMediaImpl.changeVbBlurValue(id, blurValue);
+            }
+        });
+    }
+
+    @ReactMethod
     public void mediaStreamTrackChangeVbFrameSkip(String id, int vbFrameSkip) {
         ThreadUtils.runOnExecutor(() -> {
             MediaStreamTrack track = getLocalTrack(id);

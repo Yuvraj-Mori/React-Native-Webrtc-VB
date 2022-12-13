@@ -110,6 +110,17 @@ class MediaStreamTrack extends defineCustomEventTarget(...MEDIA_STREAM_TRACK_EVE
         WebRTCModule.mediaStreamTrackChangeVbFrameSkip(this.id, vbFrameSkip);
     }
 
+    // here blur value defined blur radius
+    _changeVBBlurValue(blurValue: number) {
+        if (this.remote) {
+            throw new Error('Not implemented for remote tracks');
+        }
+        if (this.kind !== 'video') {
+            throw new Error('Only implemented for video tracks');
+        }
+        WebRTCModule.mediaStreamTrackChangeVbBlurValue(this.id, blurValue);
+    }
+
     applyConstraints() {
         throw new Error('Not implemented.');
     }

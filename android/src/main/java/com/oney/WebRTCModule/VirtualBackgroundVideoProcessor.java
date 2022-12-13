@@ -50,7 +50,7 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
     private int height = 720;
     private String vbBackgroundImageUri = null;
     private int vbFrameSkip = 3;
-    private boolean isBlur = false;
+    private int vbBlurValue = 0;
 
     final private ReactApplicationContext context;
     public static String Log_Tag = "REACT_NATIVE_WEBRTC_VB";
@@ -88,6 +88,11 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
         if(videoConstraintsMap.hasKey("vbFrameSkip"))
         {
             this.vbFrameSkip = videoConstraintsMap.getInt("vbFrameSkip");
+        }
+
+        if(videoConstraintsMap.hasKey("vbBlurValue"))
+        {
+            this.vbBlurValue = videoConstraintsMap.getInt("vbBlurValue");
         }
 
         if(this.vbBackgroundImageUri == null)
@@ -165,7 +170,7 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
 
                                             Paint paint = new Paint();
                                             paint.setXfermode(new PorterDuffXfermode(SRC_IN));
-                                            Bitmap newBitmap  = isBlur ? fastBlur(inputFrameBitmap,1,20) :  scaled;
+                                            Bitmap newBitmap  = vbBlurValue > 0  ? fastBlur(inputFrameBitmap,1, vbBlurValue) :  scaled;
                                             canvas.drawBitmap(newBitmap, 0, 0, paint);
                                             paint.setXfermode(new PorterDuffXfermode(DST_OVER));
                                             canvas.drawBitmap(inputFrameBitmap, 0, 0, paint);
@@ -225,7 +230,7 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
         return colors;
     }
 
-    public Bitmap fastBlur(Bitmap sentBitmap, float scale, int radius) {
+    private Bitmap fastBlur(Bitmap sentBitmap, float scale, int radius) {
 
         int width = Math.round(sentBitmap.getWidth() * scale);
         int height = Math.round(sentBitmap.getHeight() * scale);
@@ -427,7 +432,7 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
             }
         }
 
-        Log.e("pix", w + " " + h + " " + pix.length);
+        //Log.e("pix", w + " " + h + " " + pix.length);
         bitmap.setPixels(pix, 0, w, 0, 0, w, h);
 
         return (bitmap);
@@ -469,6 +474,8 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
                     this.backgroundImage = newBackgroundImage;
                     this.scaled = Bitmap.createScaledBitmap(backgroundImage, this.height, this.width, false );
                 }
+                //disable blur background
+                if( this.backgroundImage != null) this.vbBlurValue = 0;
             }
         }
     }
@@ -478,8 +485,8 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
         this.vbFrameSkip = vbFrameSkip;
     }
 
-    public void setBlur(boolean isBlur)
+    public void setVBBlurValue(int blurValue)
     {
-        this.isBlur = isBlur;
+        this.vbBlurValue = blurValue;
     }
 }
