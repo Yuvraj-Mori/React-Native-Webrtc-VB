@@ -246,7 +246,7 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
         int h = bitmap.getHeight();
 
         int[] pix = new int[w * h];
-        Log.e("pix", w + " " + h + " " + pix.length);
+        //Log.e("pix", w + " " + h + " " + pix.length);
         bitmap.getPixels(pix, 0, w, 0, 0, w, h);
 
         int wm = w - 1;
@@ -462,7 +462,17 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
             Bitmap newBackgroundImage = null;
             this.vbBackgroundImageUri = uri;
             try {
-                newBackgroundImage = BitmapFactory.decodeStream(new URL(this.vbBackgroundImageUri).openStream());
+                //newBackgroundImage = BitmapFactory.decodeStream(new URL(this.vbBackgroundImageUri).openStream());
+
+                if (uri.startsWith("http://") || uri.startsWith("https://") ||
+                        uri.startsWith("file://") || uri.startsWith("asset://") || uri.startsWith("data:")) {
+                    newBackgroundImage = BitmapFactory.decodeStream(new URL(this.vbBackgroundImageUri).openStream());
+                } else {
+                    int drawableId = this.context.getResources()
+                            .getIdentifier(uri, "drawable", this.context
+                                    .getPackageName());
+                    newBackgroundImage = BitmapFactory.decodeResource(this.context.getResources(), drawableId);
+                }
             }
             catch (Exception e)
             {
