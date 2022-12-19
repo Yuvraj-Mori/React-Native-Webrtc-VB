@@ -201,7 +201,7 @@ class GetUserMediaImpl {
                 cameraEnumerator,
                 videoConstraintsMap);
 
-            videoTrack = createVideoTrack(cameraCaptureController, videoConstraintsMap.hasKey("vb"));
+            videoTrack = createVideoTrack(cameraCaptureController, videoConstraintsMap);
         }
 
         if (audioTrack == null && videoTrack == null) {
@@ -252,6 +252,26 @@ class GetUserMediaImpl {
         TrackPrivate track = tracks.get(trackId);
         if (track != null && videoVbProcessor != null) {
             videoVbProcessor.setVbStatus(status);
+        }
+    }
+    void changeVbImageUri(String trackId, String uri) {
+        TrackPrivate track = tracks.get(trackId);
+        if (track != null && videoVbProcessor != null) {
+            videoVbProcessor.setVbImageUri(uri);
+        }
+    }
+
+    void changeVbBlurValue(String trackId, int blurValue) {
+        TrackPrivate track = tracks.get(trackId);
+        if (track != null && videoVbProcessor != null) {
+            videoVbProcessor.setVBBlurValue(blurValue);
+        }
+    }
+
+    void changeVbFrameSkip(String trackId, int vbFrameSkip) {
+        TrackPrivate track = tracks.get(trackId);
+        if (track != null && videoVbProcessor != null) {
+            videoVbProcessor.setVbFrameSkip(vbFrameSkip);
         }
     }
 
@@ -364,10 +384,10 @@ class GetUserMediaImpl {
         int height = displayMetrics.heightPixels;
         ScreenCaptureController screenCaptureController
             = new ScreenCaptureController(reactContext.getCurrentActivity(), width, height, mediaProjectionPermissionResultData);
-        return createVideoTrack(screenCaptureController, false);
+        return createVideoTrack(screenCaptureController, null);
     }
 
-    private VideoTrack createVideoTrack(AbstractVideoCaptureController videoCaptureController, Boolean vb) {
+    private VideoTrack createVideoTrack(AbstractVideoCaptureController videoCaptureController, final ReadableMap videoConstraintsMap) {
         videoCaptureController.initializeVideoCapturer();
 
         VideoCapturer videoCapturer = videoCaptureController.videoCapturer;
@@ -388,10 +408,12 @@ class GetUserMediaImpl {
         VideoSource videoSource = pcFactory.createVideoSource(videoCapturer.isScreencast());
         videoCapturer.initialize(surfaceTextureHelper, reactContext, videoSource.getCapturerObserver());
 
-        videoVbProcessor = new VirtualBackgroundVideoProcessor(reactContext, surfaceTextureHelper);
-        videoSource.setVideoProcessor(videoVbProcessor);
-
-        if(videoVbProcessor != null)  videoVbProcessor.setVbStatus(vb);
+        //Avoid vb process for screen capture video source
+        if(videoConstraintsMap != null)
+        {
+            videoVbProcessor = new VirtualBackgroundVideoProcessor(reactContext, surfaceTextureHelper, videoConstraintsMap);
+            videoSource.setVideoProcessor(videoVbProcessor);
+        }
 
         String id = UUID.randomUUID().toString();
         VideoTrack track = pcFactory.createVideoTrack(id, videoSource);
