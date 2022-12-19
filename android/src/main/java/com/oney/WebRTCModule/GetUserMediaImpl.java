@@ -408,8 +408,12 @@ class GetUserMediaImpl {
         VideoSource videoSource = pcFactory.createVideoSource(videoCapturer.isScreencast());
         videoCapturer.initialize(surfaceTextureHelper, reactContext, videoSource.getCapturerObserver());
 
-        videoVbProcessor = new VirtualBackgroundVideoProcessor(reactContext, surfaceTextureHelper, videoConstraintsMap);
-        videoSource.setVideoProcessor(videoVbProcessor);
+        //Avoid vb process for screen capture video source
+        if(videoConstraintsMap != null)
+        {
+            videoVbProcessor = new VirtualBackgroundVideoProcessor(reactContext, surfaceTextureHelper, videoConstraintsMap);
+            videoSource.setVideoProcessor(videoVbProcessor);
+        }
 
         String id = UUID.randomUUID().toString();
         VideoTrack track = pcFactory.createVideoTrack(id, videoSource);

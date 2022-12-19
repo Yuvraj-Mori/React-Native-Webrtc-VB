@@ -457,7 +457,7 @@ public class VirtualBackgroundVideoProcessor implements VideoProcessor {
     }
     public  void setVbImageUri(String uri)
     {
-        if(this.vbBackgroundImageUri == null || this.vbBackgroundImageUri.compareTo(uri) != 0)
+        if(this.vbBackgroundImageUri == null || this.vbBackgroundImageUri.compareTo(uri) != 0 || this.vbBlurValue > 0)
         {
             Bitmap newBackgroundImage = null;
             this.vbBackgroundImageUri = uri;
