@@ -14,7 +14,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property(nonatomic, strong) RTCVideoSource *videoSource;
 
-- (instancetype)initWithVideoSource: (RTCVideoSource*) videoSource;
+- (instancetype)initWithVideoSource: (RTCVideoSource*) videoSource andConstraints:(NSDictionary *)constraints;
+- (void)changeVbStatus:(BOOL)vbStatus;
+- (void)changeVbImageUri:(NSString*)vbImageUri;
 
 @end
 

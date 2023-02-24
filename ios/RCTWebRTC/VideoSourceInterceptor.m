@@ -29,16 +29,23 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) CVPixelBufferRef leftRotatedBackgroundBuffer;
 @property (nonatomic) CVPixelBufferRef upsideRotatedBackgroundBuffer;
 
-@property (nonatomic) UIImage *backgroundImage;
-@property (nonatomic) UIImage *rightRotatedBackgroundImage;
-@property (nonatomic) UIImage *leftRotatedBackgroundImage;
-@property (nonatomic) UIImage *upsideDownBackgroundImage;
+@property(nonatomic,assign) BOOL vbStatus ;
+@property(nonatomic, assign) NSInteger width;
+@property(nonatomic, assign) NSInteger height;
+@property (nonatomic, nullable) NSString *vbBackgroundImageUri;
 
 @end
 
 @implementation VideoSourceInterceptor
 
-- (instancetype)initWithVideoSource: (RTCVideoSource*) videoSource {
+
+NSString * const portraitBackgroundImageUrl = @"https://i.ibb.co/5RMCH5G/portrait.jpg";
+NSString * const rightRotatedBackgroundImageUrl = @"https://i.ibb.co/YNsR7St/rotated-Right.jpg";
+NSString * const leftRotatedBackgroundImageUrl = @"https://i.ibb.co/cwwSKFn/rotated-Left.jpg";
+NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jpg";
+
+- (instancetype)initWithVideoSource: (RTCVideoSource*) videoSource
+                     andConstraints:(NSDictionary *)constraints {
     if (self = [super init]) {
         _videoSource = videoSource;
         
@@ -48,18 +55,172 @@ NS_ASSUME_NONNULL_BEGIN
         
         self.segmenter = [MLKSegmenter segmenterWithOptions:options];
         
-        _backgroundImage = [UIImage imageNamed:@"portraitBackground"];
-        _rightRotatedBackgroundImage = [UIImage imageNamed:@"rightRotatedBackground"];
-        _leftRotatedBackgroundImage = [UIImage imageNamed:@"leftRotatedBackground"];
-        _upsideDownBackgroundImage = [UIImage imageNamed:@"upsideDownBackground"];
+        /*Start Init Virtual Background Configuration*/
         
-        _backgroundBuffer = [self pixelBufferFromCGImage:_backgroundImage.CGImage];
-        _rightRotatedBackgroundBuffer = [self pixelBufferFromCGImage:_rightRotatedBackgroundImage.CGImage];
-        _leftRotatedBackgroundBuffer = [self pixelBufferFromCGImage:_leftRotatedBackgroundImage.CGImage];
-        _upsideRotatedBackgroundBuffer = [self pixelBufferFromCGImage:_upsideDownBackgroundImage.CGImage];
+        //VB Status
+        /*if(constraints[@"vb"]) {
+            NSNumber *vbStatusNumber = constraints[@"vb"];
+            self.vbStatus = [vbStatusNumber boolValue];
+            
+            NSLog(@"VB Value Received %@", self.vbStatus);
+        }
+        else{
+            self.vbStatus = NO;
+        }*/
+        
+        //Video Width
+        if(constraints[@"width"])
+        {
+            self.width = [constraints[@"width"] intValue];
+        }
+        else{
+            self.width = 1280;
+        }
+        
+        //Video Height
+        if(constraints[@"height"])
+        {
+            self.height = [constraints[@"height"] intValue];
+        }
+        else{
+            self.height = 720;
+        }
+        
+        //VB Image
+        if(constraints[@"vbBackgroundImage"])
+        {
+            self.vbBackgroundImageUri = [constraints[@"vbBackgroundImage"] stringValue];
+        }
+        else{
+            self.vbBackgroundImageUri = nil;
+        }
+        
+        [self prepareVBImages:portraitBackgroundImageUrl];
     }
     return self;
 }
+
+- (void)changeVbStatus:(BOOL)vbStatus {
+    self.vbStatus = vbStatus;
+}
+
+- (void)changeVbImageUri:(NSString*)vbImageUri {
+        
+    NSLog(@"Change Image URI Received %@", vbImageUri);
+    
+    if(vbImageUri == nil || (!vbImageUri.length)) return;
+    
+    self.vbBackgroundImageUri = vbImageUri;
+    
+    if([vbImageUri hasPrefix: @"http://"] || [vbImageUri hasPrefix: @"https://"])
+    {
+        NSLog(@"Image URI is Http/Https");
+        [self prepareVBImages:vbImageUri];
+    }
+}
+
+- (void) prepareVBImages:(NSString *) imageURL
+{
+    
+    CGSize newSize = CGSizeMake(self.width, self.height);
+    NSURL *url = [NSURL URLWithString:imageURL];
+    
+    UIImage *scaledImage = [self downloadAndRescaleImageWithURL:url toSize:newSize];
+    
+    
+    _backgroundBuffer = [self pixelBufferFromUIImage:scaledImage];
+    _rightRotatedBackgroundBuffer = _backgroundBuffer;
+    _leftRotatedBackgroundBuffer = _backgroundBuffer;
+    _upsideRotatedBackgroundBuffer = _backgroundBuffer;
+}
+
+- (CVPixelBufferRef)pixelBufferFromUIImage:(UIImage *)image {
+
+    // Get the image size and create a dictionary of pixel buffer attributes
+    CGSize imageSize = image.size;
+    NSDictionary *options = @{
+        (NSString*)kCVPixelBufferCGImageCompatibilityKey : @YES,
+        (NSString*)kCVPixelBufferCGBitmapContextCompatibilityKey : @YES,
+        (NSString*)kCVPixelBufferWidthKey : @(imageSize.width),
+        (NSString*)kCVPixelBufferHeightKey : @(imageSize.height),
+        (NSString*)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_32ARGB)
+    };
+    
+    // Create a new pixel buffer with the specified attributes
+    CVPixelBufferRef pixelBuffer = NULL;
+    CVReturn status = CVPixelBufferCreate(kCFAllocatorDefault, imageSize.width, imageSize.height,
+                                          kCVPixelFormatType_32ARGB, (__bridge CFDictionaryRef)options, &pixelBuffer);
+    NSParameterAssert(status == kCVReturnSuccess && pixelBuffer != NULL);
+    
+    // Lock the pixel buffer base address
+    CVPixelBufferLockBaseAddress(pixelBuffer, 0);
+    
+    // Create a bitmap context for the pixel buffer
+    void *pxdata = CVPixelBufferGetBaseAddress(pixelBuffer);
+    CGColorSpaceRef rgbColorSpace = CGColorSpaceCreateDeviceRGB();
+    CGContextRef context = CGBitmapContextCreate(pxdata, imageSize.width, imageSize.height, 8, CVPixelBufferGetBytesPerRow(pixelBuffer),
+                                                 rgbColorSpace, kCGImageAlphaPremultipliedLast);
+    NSParameterAssert(context);
+    
+    // Draw the image into the bitmap context
+    CGContextDrawImage(context, CGRectMake(0, 0, imageSize.width, imageSize.height), image.CGImage);
+    
+    // Clean up the bitmap context and color space
+    CGColorSpaceRelease(rgbColorSpace);
+    CGContextRelease(context);
+    
+    // Unlock the pixel buffer base address
+    CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
+    
+    // Return the pixel buffer
+    return pixelBuffer;
+}
+
+- (UIImage *)downloadAndRescaleImageWithURL:(NSURL *)url toSize:(CGSize)newSize {
+    
+    // Download the image data from the URL
+    NSData *imageData = [NSData dataWithContentsOfURL:url];
+    
+    // Create a UIImage from the downloaded data
+    UIImage *tmpImage = [UIImage imageWithData:imageData];
+    
+    // If the image was not downloaded successfully, return nil
+    if (!tmpImage) {
+        return nil;
+    }
+    
+    UIImage *image =  [UIImage imageWithCGImage:tmpImage.CGImage scale:tmpImage.scale orientation:UIImageOrientationLeft];
+    
+    
+    // Create a new bitmap context with the desired size
+    UIGraphicsBeginImageContextWithOptions(newSize, YES  , 0.0);
+    
+    // Draw the image into the context
+    [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
+    
+    // Get the new scaled image from the context
+    UIImage *scaledImage = UIGraphicsGetImageFromCurrentImageContext();
+    
+    // Clean up the bitmap context
+    UIGraphicsEndImageContext();
+    
+    // Return the scaled image
+    return scaledImage;
+}
+- (CVPixelBufferRef) pixelBufferFromImageUrl: (NSString *) imageURL
+{
+    NSURL *url = [NSURL URLWithString:imageURL];
+    CGDataProviderRef dataProvider = CGDataProviderCreateWithURL((CFURLRef)url);
+    CGImageRef backgroundRef = CGImageCreateWithJPEGDataProvider(dataProvider, NULL, true, kCGRenderingIntentDefault);
+
+    CVPixelBufferRef resultBuffer = NULL;
+    resultBuffer = [self pixelBufferFromCGImage:backgroundRef];
+
+    CGDataProviderRelease(dataProvider);
+
+    return resultBuffer;
+}
+
 
 - (CVPixelBufferRef) pixelBufferFromCGImage: (CGImageRef) image
 {
@@ -70,8 +231,8 @@ NS_ASSUME_NONNULL_BEGIN
 
     CVPixelBufferRef pxbuffer = NULL;
     
-    CVReturn status = CVPixelBufferCreate(kCFAllocatorDefault, CGImageGetWidth(image),
-                        CGImageGetHeight(image), kCVPixelFormatType_32BGRA, (__bridge CFDictionaryRef) options,
+    CVReturn status = CVPixelBufferCreate(kCFAllocatorDefault, self.width,
+                        self.height, kCVPixelFormatType_32BGRA, (__bridge CFDictionaryRef) options,
                         &pxbuffer);
 
     NSParameterAssert(status == kCVReturnSuccess && pxbuffer != NULL);
@@ -80,18 +241,19 @@ NS_ASSUME_NONNULL_BEGIN
     void *pxdata = CVPixelBufferGetBaseAddress(pxbuffer);
 
     CGColorSpaceRef rgbColorSpace = CGColorSpaceCreateDeviceRGB();
-    CGContextRef context = CGBitmapContextCreate(pxdata, CGImageGetWidth(image),
-                                                 CGImageGetHeight(image), 8, 4*CGImageGetWidth(image), rgbColorSpace,
+    
+    CGContextRef context = CGBitmapContextCreate(pxdata, self.width,
+                                                 self.height, 8, 4*self.width, rgbColorSpace,
                                                  kCGImageAlphaPremultipliedLast);
     NSParameterAssert(context);
     
     CGContextConcatCTM(context, CGAffineTransformMakeRotation(-90 * M_PI / 180.0));
-    CGContextTranslateCTM(context, -640, 0);
-    CGAffineTransform flipVertical = CGAffineTransformMake( 1, 0, 0, -1, 0, CGImageGetHeight(image) );
+    CGContextTranslateCTM(context, -self.width, 0);
+    CGAffineTransform flipVertical = CGAffineTransformMake( 1, 0, 0, -1, 0, self.height );
     CGContextConcatCTM(context, flipVertical);
 
-    CGContextDrawImage(context, CGRectMake(0, 0, CGImageGetWidth(image),
-                                           CGImageGetHeight(image)), image);
+    CGContextDrawImage(context, CGRectMake(0, 0, self.width,
+                                           self.height), image);
     CGColorSpaceRelease(rgbColorSpace);
     CGContextRelease(context);
 
@@ -101,12 +263,34 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)capturer:(nonnull RTCVideoCapturer *)capturer didCaptureVideoFrame:(nonnull RTCVideoFrame *)frame {
     
-    RTCCVPixelBuffer* pixelBufferr = (RTCCVPixelBuffer *)frame.buffer;
-    CVPixelBufferRef pixelBufferRef = pixelBufferr.pixelBuffer;
-
     self.rotation = frame.rotation;
     self.timeStampNs = frame.timeStampNs;
     self.capturer = capturer;
+    
+    RTCCVPixelBuffer* pixelBufferr = (RTCCVPixelBuffer *)frame.buffer;
+    CVPixelBufferRef pixelBufferRef = pixelBufferr.pixelBuffer;
+    
+    /** VB Disable to without process frame return*/
+    if(self.vbStatus == NO)
+    {
+    
+        RTC_OBJC_TYPE(RTCCVPixelBuffer) *rtcPixelBuffer =
+              [[RTC_OBJC_TYPE(RTCCVPixelBuffer) alloc] initWithPixelBuffer:pixelBufferRef];
+        
+        RTCI420Buffer *i420buffer = [rtcPixelBuffer toI420];
+        
+        RTC_OBJC_TYPE(RTCVideoFrame) *processedFrame =
+              [[RTC_OBJC_TYPE(RTCVideoFrame) alloc] initWithBuffer:i420buffer
+                                                          rotation:self.rotation
+                                                       timeStampNs:self.timeStampNs];
+        
+        [_videoSource capturer:self.capturer didCaptureVideoFrame:processedFrame];
+        
+        //NSLog(@"Virtual Background Disabled");
+        return;
+    }
+    
+    //NSLog(@"Segmantation Process Applay width:%i , height:%i", self.width, self.height);
     
     CMSampleBufferRef sampleBuffer = [self getCMSampleBuffer:pixelBufferRef timeStamp:self.timeStampNs];
     
@@ -322,3 +506,4 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 NS_ASSUME_NONNULL_END
+

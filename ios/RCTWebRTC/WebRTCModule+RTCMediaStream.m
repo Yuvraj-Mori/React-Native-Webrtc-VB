@@ -52,7 +52,8 @@
     
     // If virtual backround is enabled, use video source interceptor before video source
     if (videoContraints[@"vb"]) {
-        self.videoSourceInterceptor = [[VideoSourceInterceptor alloc]initWithVideoSource:videoSource];
+        self.videoSourceInterceptor = [[VideoSourceInterceptor alloc]initWithVideoSource:videoSource
+                                                                        andConstraints:videoContraints];
         videoCapturer = [[RTCCameraVideoCapturer alloc] initWithDelegate:self.videoSourceInterceptor];
     }
     else {
@@ -300,6 +301,22 @@ RCT_EXPORT_METHOD(mediaStreamTrackRelease:(nonnull NSString *)trackID)
         if([track.kind isEqualToString:kRTCMediaStreamTrackKindVideo]) {
             self.videoSourceInterceptor = nil;
         }
+    }
+}
+
+RCT_EXPORT_METHOD(mediaStreamTrackChangeVbStatus:(nonnull NSString *)trackID : (BOOL)status)
+{
+    RTCMediaStreamTrack *track = self.localTracks[trackID];
+    if (track && self.videoSourceInterceptor != nil) {
+        [self.videoSourceInterceptor changeVbStatus:status];
+    }
+}
+
+RCT_EXPORT_METHOD(mediaStreamTrackChangeVbImageUri:(nonnull NSString *)trackID : (NSString *)vbImageUri)
+{
+    RTCMediaStreamTrack *track = self.localTracks[trackID];
+    if (track && self.videoSourceInterceptor != nil) {
+        [self.videoSourceInterceptor changeVbImageUri:vbImageUri];
     }
 }
 
