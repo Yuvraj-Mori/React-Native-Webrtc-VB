@@ -320,6 +320,23 @@ RCT_EXPORT_METHOD(mediaStreamTrackChangeVbImageUri:(nonnull NSString *)trackID :
     }
 }
 
+RCT_EXPORT_METHOD(mediaStreamTrackChangeVbFrameSkip:(nonnull NSString *)trackID : (NSInteger)vbFrameSkip)
+{
+    RTCMediaStreamTrack *track = self.localTracks[trackID];
+    if (track && self.videoSourceInterceptor != nil) {
+        [self.videoSourceInterceptor changeVbFrameSkip:vbFrameSkip];
+    }
+}
+
+RCT_EXPORT_METHOD(mediaStreamTrackChangeVbBlurValue:(nonnull NSString *)trackID : (NSInteger)blurValue)
+{
+    RTCMediaStreamTrack *track = self.localTracks[trackID];
+    if (track && self.videoSourceInterceptor != nil) {
+        [self.videoSourceInterceptor changeVbBlurValue:blurValue];
+    }
+}
+
+
 RCT_EXPORT_METHOD(mediaStreamTrackSetEnabled:(nonnull NSString *)trackID : (BOOL)enabled)
 {
   RTCMediaStreamTrack *track = [self trackForId:trackID];

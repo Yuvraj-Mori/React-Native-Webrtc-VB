@@ -35,6 +35,8 @@
         self.width = [constraints[@"width"] intValue];
         self.height = [constraints[@"height"] intValue];
         self.frameRate = [constraints[@"frameRate"] intValue];
+        
+        //Rutime VB Start or Image Applay Set VB Always True
         if(constraints[@"vb"]) {
             self.vb = YES;
         }

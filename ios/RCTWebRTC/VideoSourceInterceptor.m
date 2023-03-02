@@ -6,6 +6,7 @@
 //
 
 #import "VideoSourceInterceptor.h"
+#import "RCTUtils.h"
 #import <WebRTC/RTCCVPixelBuffer.h>
 #import <WebRTC/RTCVideoFrame.h>
 #import <WebRTC/RTCNativeI420Buffer.h>
@@ -30,9 +31,12 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) CVPixelBufferRef upsideRotatedBackgroundBuffer;
 
 @property(nonatomic,assign) BOOL vbStatus ;
+@property (nonatomic, nullable) NSString *vbBackgroundImageUri;
 @property(nonatomic, assign) NSInteger width;
 @property(nonatomic, assign) NSInteger height;
-@property (nonatomic, nullable) NSString *vbBackgroundImageUri;
+@property(nonatomic, assign) NSInteger vbFrameSkip;
+@property(nonatomic, assign) NSInteger vbBlurValue;
+@property(nonatomic, assign) NSInteger frameCounter;
 
 @end
 
@@ -86,6 +90,17 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
             self.height = 720;
         }
         
+        //VB Frame Skip
+        if(constraints[@"vbFrameSkip"])
+        {
+            self.vbFrameSkip = [constraints[@"vbFrameSkip"] intValue];
+        }
+        else{
+            self.vbFrameSkip = 3;
+        }
+        
+        self.frameCounter = 0;
+        
         //VB Image
         if(constraints[@"vbBackgroundImage"])
         {
@@ -95,7 +110,8 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
             self.vbBackgroundImageUri = nil;
         }
         
-        [self prepareVBImages:portraitBackgroundImageUrl];
+        //[self prepareVBImages:portraitBackgroundImageUrl];
+        //[self prepareVBImages:@"1"];
     }
     return self;
 }
@@ -106,18 +122,36 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
 
 - (void)changeVbImageUri:(NSString*)vbImageUri {
         
-    NSLog(@"Change Image URI Received %@", vbImageUri);
-    
     if(vbImageUri == nil || (!vbImageUri.length)) return;
     
-    self.vbBackgroundImageUri = vbImageUri;
+    NSComparisonResult result = [vbImageUri compare: self.vbBackgroundImageUri];
     
-    if([vbImageUri hasPrefix: @"http://"] || [vbImageUri hasPrefix: @"https://"])
-    {
-        NSLog(@"Image URI is Http/Https");
-        [self prepareVBImages:vbImageUri];
-    }
+    if((result != NSOrderedAscending && result != NSOrderedDescending) && self.vbBlurValue == 0) return;
+       
+    [self prepareVBImages:vbImageUri];
+    
 }
+
+- (void)changeVbFrameSkip:(NSInteger)vbFrameSkip {
+        
+    if(vbFrameSkip < 0) return;
+    self.vbFrameSkip = vbFrameSkip;
+}
+
+- (void)changeVbBlurValue:(NSInteger)vbBlurValue {
+        
+    NSLog(@"Recived changeVbBlurValue %i", self.vbBlurValue);
+    
+    if(vbBlurValue < 0) return;
+    self.vbBlurValue = vbBlurValue;
+}
+
+- (void)updateFrameCounter {
+    self.frameCounter++;
+    if(self.frameCounter >= self.vbFrameSkip) self.frameCounter = 0;
+}
+
+
 
 - (void) prepareVBImages:(NSString *) imageURL
 {
@@ -127,6 +161,17 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
     
     UIImage *scaledImage = [self downloadAndRescaleImageWithURL:url toSize:newSize];
     
+    if(scaledImage == nil)
+    {
+        self.vbBackgroundImageUri = nil;
+        NSLog(@"Provided Image %@ not scaled", imageURL);
+        return;
+    }
+    
+    self.vbBackgroundImageUri = imageURL;
+    
+    //if Image Url Change to set blur value 0
+    if(self.vbBackgroundImageUri != nil || self.vbBackgroundImageUri.length != 0) self.vbBlurValue = 0;
     
     _backgroundBuffer = [self pixelBufferFromUIImage:scaledImage];
     _rightRotatedBackgroundBuffer = _backgroundBuffer;
@@ -162,6 +207,7 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
                                                  rgbColorSpace, kCGImageAlphaPremultipliedLast);
     NSParameterAssert(context);
     
+    
     // Draw the image into the bitmap context
     CGContextDrawImage(context, CGRectMake(0, 0, imageSize.width, imageSize.height), image.CGImage);
     
@@ -178,11 +224,41 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
 
 - (UIImage *)downloadAndRescaleImageWithURL:(NSURL *)url toSize:(CGSize)newSize {
     
-    // Download the image data from the URL
-    NSData *imageData = [NSData dataWithContentsOfURL:url];
+    UIImage *tmpImage = nil;
     
-    // Create a UIImage from the downloaded data
-    UIImage *tmpImage = [UIImage imageWithData:imageData];
+     //tmpImage = RCTImageFromLocalBundleAssetURL(url);
+    
+    /*if(isRemote){
+        // Download the image data from the URL
+        NSData *imageData = [NSData dataWithContentsOfURL:url];
+    
+        // Create a UIImage from the downloaded data
+         tmpImage = [UIImage imageWithData:imageData];
+    }
+    else{
+         tmpImage = [UIImage imageNamed:@"1"];
+    }*/
+    
+    
+    
+    NSURL *URL = url;
+    NSString *scheme = URL.scheme.lowercaseString;
+    if ([scheme isEqualToString:@"file"]) {
+        tmpImage = RCTImageFromLocalAssetURL(URL);
+      if (!tmpImage) {
+          tmpImage = RCTImageFromLocalBundleAssetURL(URL);
+      }
+      if (!tmpImage) {
+          return nil;
+      }
+    } else if ([scheme isEqualToString:@"data"]) {
+        tmpImage = [UIImage imageWithData:[NSData dataWithContentsOfURL:URL]];
+    } else if ([scheme isEqualToString:@"http"]) {
+        tmpImage = [UIImage imageWithData:[NSData dataWithContentsOfURL:URL]];
+    } else {
+        NSString *urlString = [URL absoluteString];
+        tmpImage = [UIImage imageNamed:urlString];
+    }
     
     // If the image was not downloaded successfully, return nil
     if (!tmpImage) {
@@ -241,6 +317,9 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
     void *pxdata = CVPixelBufferGetBaseAddress(pxbuffer);
 
     CGColorSpaceRef rgbColorSpace = CGColorSpaceCreateDeviceRGB();
+    /*CGContextRef context = CGBitmapContextCreate(pxdata, CGImageGetWidth(image),
+                                                 CGImageGetHeight(image), 8, 4*CGImageGetWidth(image), rgbColorSpace,
+                                                 kCGImageAlphaPremultipliedLast);*/
     
     CGContextRef context = CGBitmapContextCreate(pxdata, self.width,
                                                  self.height, 8, 4*self.width, rgbColorSpace,
@@ -271,7 +350,7 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
     CVPixelBufferRef pixelBufferRef = pixelBufferr.pixelBuffer;
     
     /** VB Disable to without process frame return*/
-    if(self.vbStatus == NO)
+    if(self.vbStatus == NO || ((self.vbBackgroundImageUri == nil || self.vbBackgroundImageUri.length == 0 ) && self.vbBlurValue == 0))
     {
     
         RTC_OBJC_TYPE(RTCCVPixelBuffer) *rtcPixelBuffer =
@@ -291,39 +370,43 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
     }
     
     //NSLog(@"Segmantation Process Applay width:%i , height:%i", self.width, self.height);
+    if(self.frameCounter == 0)
+    {
+        CMSampleBufferRef sampleBuffer = [self getCMSampleBuffer:pixelBufferRef timeStamp:self.timeStampNs];
     
-    CMSampleBufferRef sampleBuffer = [self getCMSampleBuffer:pixelBufferRef timeStamp:self.timeStampNs];
+        MLKVisionImage *image = [[MLKVisionImage alloc] initWithBuffer:sampleBuffer];
+        image.orientation = [self imageOrientation];
     
-    MLKVisionImage *image = [[MLKVisionImage alloc] initWithBuffer:sampleBuffer];
-    image.orientation = [self imageOrientation];
+        NSError *error;
+        MLKSegmentationMask *mask =
+            [self.segmenter resultsInImage:image error:&error];
+        if (error != nil) {
+            // Error.
+            return;
+        }
     
-    NSError *error;
-    MLKSegmentationMask *mask =
-        [self.segmenter resultsInImage:image error:&error];
-    if (error != nil) {
-      // Error.
-      return;
+        [self applySegmentationMask:mask
+                      toPixelBuffer:pixelBufferRef
+                           rotation:self.rotation];
+        
+        RTC_OBJC_TYPE(RTCCVPixelBuffer) *rtcPixelBuffer =
+        [[RTC_OBJC_TYPE(RTCCVPixelBuffer) alloc] initWithPixelBuffer:pixelBufferRef];
+        
+        RTCI420Buffer *i420buffer = [rtcPixelBuffer toI420];
+        
+        RTC_OBJC_TYPE(RTCVideoFrame) *processedFrame =
+        [[RTC_OBJC_TYPE(RTCVideoFrame) alloc] initWithBuffer:i420buffer
+                                                    rotation:self.rotation
+                                                 timeStampNs:self.timeStampNs];
+        
+        [_videoSource capturer:self.capturer didCaptureVideoFrame:processedFrame];
+        
+        CMSampleBufferInvalidate(sampleBuffer);
+        CFRelease(sampleBuffer);
+        sampleBuffer = NULL;
     }
     
-    [self applySegmentationMask:mask
-                  toPixelBuffer:pixelBufferRef
-                       rotation:self.rotation];
-    
-    RTC_OBJC_TYPE(RTCCVPixelBuffer) *rtcPixelBuffer =
-          [[RTC_OBJC_TYPE(RTCCVPixelBuffer) alloc] initWithPixelBuffer:pixelBufferRef];
-    
-    RTCI420Buffer *i420buffer = [rtcPixelBuffer toI420];
-    
-    RTC_OBJC_TYPE(RTCVideoFrame) *processedFrame =
-          [[RTC_OBJC_TYPE(RTCVideoFrame) alloc] initWithBuffer:i420buffer
-                                                      rotation:self.rotation
-                                                   timeStampNs:self.timeStampNs];
-    
-    [_videoSource capturer:self.capturer didCaptureVideoFrame:processedFrame];
-    
-    CMSampleBufferInvalidate(sampleBuffer);
-    CFRelease(sampleBuffer);
-    sampleBuffer = NULL;
+    [self updateFrameCounter];
 }
 
 - (CMSampleBufferRef)getCMSampleBuffer: (CVPixelBufferRef)pixelBuffer timeStamp: (int64_t) timeStampNs  {
@@ -343,7 +426,6 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
                                              formatDesc,
                                              &info,
                                              &sampleBuffer);
-
     return sampleBuffer;
 }
 
@@ -412,8 +494,20 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
                      rotation:(RTCVideoRotation)rotation{
     
     CVPixelBufferRef currentBackground = NULL;
+    CVPixelBufferRef blurBackground = NULL;
     
-    switch (rotation) {
+    BOOL isBlur  = self.vbBlurValue > 0 ? YES : NO ;
+    
+    if(isBlur)
+    {
+        blurBackground = [self blurImageEffect:imageBuffer withRadius:self.vbBlurValue];
+    }
+    else
+    {
+        currentBackground = _backgroundBuffer;
+    }
+    
+   /* switch (rotation) {
         case RTCVideoRotation_90:
             currentBackground = _backgroundBuffer;
             break;
@@ -426,13 +520,13 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
         case RTCVideoRotation_180: //Left rotated screen
             currentBackground = _rightRotatedBackgroundBuffer;
             break;
-    }
+    }*/
     
     size_t width = CVPixelBufferGetWidth(mask.buffer);
     size_t height = CVPixelBufferGetHeight(mask.buffer);
 
     CVPixelBufferLockBaseAddress(imageBuffer, 0);
-    CVPixelBufferLockBaseAddress(currentBackground, 0);
+    CVPixelBufferLockBaseAddress(isBlur ? blurBackground : currentBackground, 0);
     CVPixelBufferLockBaseAddress(mask.buffer, kCVPixelBufferLock_ReadOnly);
 
     float *maskAddress = (float *)CVPixelBufferGetBaseAddress(mask.buffer);
@@ -442,8 +536,8 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
     size_t bytesPerRow = CVPixelBufferGetBytesPerRow(imageBuffer);
     static const int kBGRABytesPerPixel = 4;
     
-    unsigned char *backgroundImageAddress = (unsigned char *)CVPixelBufferGetBaseAddress(currentBackground);
-    size_t backgroundImageBytesPerRow = CVPixelBufferGetBytesPerRow(currentBackground);
+    unsigned char *backgroundImageAddress = (unsigned char *)CVPixelBufferGetBaseAddress(isBlur ? blurBackground : currentBackground);
+    size_t backgroundImageBytesPerRow = CVPixelBufferGetBytesPerRow(isBlur ? blurBackground : currentBackground);
      
     static const float kMaxColorComponentValue = 255.0f;
 
@@ -498,9 +592,58 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
         maskAddress += maskBytesPerRow / sizeof(float);
     }
 
+    
     CVPixelBufferUnlockBaseAddress(imageBuffer, 0);
-    CVPixelBufferUnlockBaseAddress(currentBackground, 0);
+    CVPixelBufferUnlockBaseAddress(isBlur ? blurBackground : currentBackground, 0);
     CVPixelBufferUnlockBaseAddress(mask.buffer, kCVPixelBufferLock_ReadOnly);
+    
+    if(blurBackground != NULL && isBlur)
+    {
+        CVPixelBufferRelease(blurBackground);
+    }
+}
+
+/**Blur Effect*/
+- (UIImage *)imageFromPixelBuffer:(CVPixelBufferRef)pixelBuffer {
+    CIImage *ciImage = [CIImage imageWithCVPixelBuffer:pixelBuffer];
+    CIContext *context = [CIContext contextWithOptions:nil];
+    CGImageRef cgImage = [context createCGImage:ciImage fromRect:ciImage.extent];
+    UIImage *image = [UIImage imageWithCGImage:cgImage];
+    CGImageRelease(cgImage);
+    return image;
+}
+
+
+- (UIImage *)blurredImageWithImage:(UIImage *)sourceImage blurRadius:(CGFloat) blurRadius
+{
+
+    //  Create our blurred image
+    CIContext *context = [CIContext contextWithOptions:nil];
+    CIImage *inputImage = [CIImage imageWithCGImage:sourceImage.CGImage];
+
+    //  Setting up Gaussian Blur
+    CIFilter *filter = [CIFilter filterWithName:@"CIGaussianBlur"];
+    [filter setValue:inputImage forKey:kCIInputImageKey];
+    [filter setValue:[NSNumber numberWithFloat:blurRadius] forKey:@"inputRadius"];
+    CIImage *result = [filter valueForKey:kCIOutputImageKey];
+
+    /*  CIGaussianBlur has a tendency to shrink the image a little, this ensures it matches
+     *  up exactly to the bounds of our original image */
+    CGImageRef cgImage = [context createCGImage:result fromRect:[inputImage extent]];
+
+    UIImage *retVal = [UIImage imageWithCGImage:cgImage];
+
+    if (cgImage) {
+        CGImageRelease(cgImage);
+    }
+
+    return retVal;
+}
+-(CVPixelBufferRef)blurImageEffect:(CVPixelBufferRef )imageBuffRef withRadius:(CGFloat)radius
+{
+    UIImage *imgage = [self imageFromPixelBuffer:imageBuffRef];
+    UIImage *blurImgage = [self blurredImageWithImage:imgage blurRadius:radius];
+    return [self pixelBufferFromUIImage:blurImgage];
 }
 
 @end

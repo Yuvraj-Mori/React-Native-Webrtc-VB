@@ -17,6 +17,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)initWithVideoSource: (RTCVideoSource*) videoSource andConstraints:(NSDictionary *)constraints;
 - (void)changeVbStatus:(BOOL)vbStatus;
 - (void)changeVbImageUri:(NSString*)vbImageUri;
+- (void)changeVbFrameSkip:(NSInteger)vbFrameSkip;
+- (void)changeVbBlurValue:(NSInteger)vbBlurValue;
 
 @end
 
