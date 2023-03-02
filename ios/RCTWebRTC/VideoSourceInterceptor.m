@@ -34,6 +34,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, nullable) NSString *vbBackgroundImageUri;
 @property(nonatomic, assign) NSInteger width;
 @property(nonatomic, assign) NSInteger height;
+@property(nonatomic, assign) NSInteger idelWidth;
+@property(nonatomic, assign) NSInteger idelHeight;
 @property(nonatomic, assign) NSInteger vbFrameSkip;
 @property(nonatomic, assign) NSInteger vbBlurValue;
 @property(nonatomic, assign) NSInteger frameCounter;
@@ -89,6 +91,9 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
         else{
             self.height = 720;
         }
+        
+        self.idelWidth = 0;
+        self.idelHeight = 0;
         
         //VB Frame Skip
         if(constraints[@"vbFrameSkip"])
@@ -156,7 +161,10 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
 - (void) prepareVBImages:(NSString *) imageURL
 {
     
-    CGSize newSize = CGSizeMake(self.width, self.height);
+    CGSize newSize = (self.idelWidth == 0 || self.idelHeight == 0) ?
+    CGSizeMake(self.width, self.height) :
+    CGSizeMake(self.idelWidth, self.idelHeight);
+    
     NSURL *url = [NSURL URLWithString:imageURL];
     
     UIImage *scaledImage = [self downloadAndRescaleImageWithURL:url toSize:newSize];
@@ -174,9 +182,9 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
     if(self.vbBackgroundImageUri != nil || self.vbBackgroundImageUri.length != 0) self.vbBlurValue = 0;
     
     _backgroundBuffer = [self pixelBufferFromUIImage:scaledImage];
-    _rightRotatedBackgroundBuffer = _backgroundBuffer;
+    /*_rightRotatedBackgroundBuffer = _backgroundBuffer;
     _leftRotatedBackgroundBuffer = _backgroundBuffer;
-    _upsideRotatedBackgroundBuffer = _backgroundBuffer;
+    _upsideRotatedBackgroundBuffer = _backgroundBuffer;*/
 }
 
 - (CVPixelBufferRef)pixelBufferFromUIImage:(UIImage *)image {
@@ -225,21 +233,6 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
 - (UIImage *)downloadAndRescaleImageWithURL:(NSURL *)url toSize:(CGSize)newSize {
     
     UIImage *tmpImage = nil;
-    
-     //tmpImage = RCTImageFromLocalBundleAssetURL(url);
-    
-    /*if(isRemote){
-        // Download the image data from the URL
-        NSData *imageData = [NSData dataWithContentsOfURL:url];
-    
-        // Create a UIImage from the downloaded data
-         tmpImage = [UIImage imageWithData:imageData];
-    }
-    else{
-         tmpImage = [UIImage imageNamed:@"1"];
-    }*/
-    
-    
     
     NSURL *URL = url;
     NSString *scheme = URL.scheme.lowercaseString;
@@ -317,9 +310,6 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
     void *pxdata = CVPixelBufferGetBaseAddress(pxbuffer);
 
     CGColorSpaceRef rgbColorSpace = CGColorSpaceCreateDeviceRGB();
-    /*CGContextRef context = CGBitmapContextCreate(pxdata, CGImageGetWidth(image),
-                                                 CGImageGetHeight(image), 8, 4*CGImageGetWidth(image), rgbColorSpace,
-                                                 kCGImageAlphaPremultipliedLast);*/
     
     CGContextRef context = CGBitmapContextCreate(pxdata, self.width,
                                                  self.height, 8, 4*self.width, rgbColorSpace,
@@ -349,8 +339,15 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
     RTCCVPixelBuffer* pixelBufferr = (RTCCVPixelBuffer *)frame.buffer;
     CVPixelBufferRef pixelBufferRef = pixelBufferr.pixelBuffer;
     
+    if((self.idelWidth == 0 || self.idelHeight == 0) && frame.buffer != nil)
+    {
+        self.idelWidth = frame.width;
+        self.idelHeight = frame.height;
+    }
+    
     /** VB Disable to without process frame return*/
-    if(self.vbStatus == NO || ((self.vbBackgroundImageUri == nil || self.vbBackgroundImageUri.length == 0 ) && self.vbBlurValue == 0))
+    if(self.vbStatus == NO || ((self.vbBackgroundImageUri == nil ||
+                                self.vbBackgroundImageUri.length == 0 || self.backgroundBuffer == nil ) && self.vbBlurValue == 0))
     {
     
         RTC_OBJC_TYPE(RTCCVPixelBuffer) *rtcPixelBuffer =
@@ -506,6 +503,11 @@ NSString * const upsideBackgroundImageUrl = @"https://i.ibb.co/mcSJZQk/upside.jp
     {
         currentBackground = _backgroundBuffer;
     }
+    
+    
+    /*NSLog(@"Mask (%i, %i),  Frame (%i,%i), Image (%i,%i), Idel (%i,%i)", CVPixelBufferGetWidth(mask.buffer), CVPixelBufferGetHeight(mask.buffer),
+          CVPixelBufferGetWidth(imageBuffer), CVPixelBufferGetHeight(imageBuffer), CVPixelBufferGetWidth(currentBackground),
+           CVPixelBufferGetHeight(currentBackground), self.idelWidth, self.idelHeight);*/
     
    /* switch (rotation) {
         case RTCVideoRotation_90:
